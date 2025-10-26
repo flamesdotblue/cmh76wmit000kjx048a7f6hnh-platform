@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ShoppingCart, X, Menu, User, Shield } from 'lucide-react';
+import { ShoppingCart, X, Menu, User, Shield, LogOut, ShieldCheck } from 'lucide-react';
 
 function LogoWordmark() {
   return (
@@ -15,26 +15,77 @@ function LogoWordmark() {
   );
 }
 
-function LogoMonogram() {
+function AuthDialog({ open, onClose, onLogin }) {
+  const [step, setStep] = useState('form'); // form | otp
+  const [form, setForm] = useState({ name: '', email: '', role: 'manager' });
+  const [otp, setOtp] = useState('');
+
+  const submitForm = (e) => {
+    e.preventDefault();
+    setStep('otp');
+  };
+  const submitOtp = async (e) => {
+    e.preventDefault();
+    if (otp.trim().length < 4) return;
+    const ok = await onLogin(form);
+    if (ok) onClose();
+  };
+
+  if (!open) return null;
   return (
-    <div className="flex items-center gap-2">
-      <div className="relative h-8 w-8 rounded-full bg-neutral-900 ring-2 ring-yellow-500 grid place-items-center">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M5 17L11.5 5L19 17H5Z" stroke="#EAB308" strokeWidth="2" />
-          <path d="M9 15H15" stroke="#EAB308" strokeWidth="2" />
-        </svg>
+    <div className="fixed inset-0 z-50">
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[92vw] max-w-md rounded-xl border border-neutral-800 bg-neutral-950 p-5 shadow-2xl">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold flex items-center gap-2"><ShieldCheck size={18} className="text-yellow-400"/> Secure Login</h3>
+          <button onClick={onClose} className="p-2 rounded hover:bg-neutral-900"><X size={18} /></button>
+        </div>
+        {step === 'form' && (
+          <form onSubmit={submitForm} className="mt-4 space-y-3">
+            <div className="grid grid-cols-1 gap-3">
+              <div>
+                <label className="block text-xs text-neutral-400 mb-1">Full Name</label>
+                <input value={form.name} onChange={(e)=>setForm({...form,name:e.target.value})} className="w-full rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500" placeholder="Dhruv or Partner" required />
+              </div>
+              <div>
+                <label className="block text-xs text-neutral-400 mb-1">Email</label>
+                <input type="email" value={form.email} onChange={(e)=>setForm({...form,email:e.target.value})} className="w-full rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500" placeholder="you@example.com" required />
+              </div>
+              <div>
+                <label className="block text-xs text-neutral-400 mb-1">Role</label>
+                <select value={form.role} onChange={(e)=>setForm({...form,role:e.target.value})} className="w-full rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                  <option value="manager">Manager (Partner)</option>
+                  <option value="admin">Admin (Dhruv)</option>
+                </select>
+              </div>
+            </div>
+            <button type="submit" className="w-full rounded-md bg-yellow-500 text-black font-semibold px-3 py-2 hover:bg-yellow-400">Continue</button>
+            <p className="text-xs text-neutral-500">Tip: Use name Dhruv for Admin, Partner for Manager.</p>
+          </form>
+        )}
+        {step === 'otp' && (
+          <form onSubmit={submitOtp} className="mt-4 space-y-3">
+            <div>
+              <label className="block text-xs text-neutral-400 mb-1">Enter OTP</label>
+              <input value={otp} onChange={(e)=>setOtp(e.target.value)} className="w-full rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500" placeholder="1234" />
+            </div>
+            <button type="submit" className="w-full rounded-md bg-yellow-500 text-black font-semibold px-3 py-2 hover:bg-yellow-400">Verify & Login</button>
+            <button type="button" onClick={()=>setStep('form')} className="w-full rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm hover:border-yellow-500">Back</button>
+          </form>
+        )}
       </div>
-      <span className="text-lg font-bold tracking-tight">A to Z Collection</span>
     </div>
   );
 }
 
-export default function Header({ cart, removeFromCart, updateQty, subtotal }) {
+export default function Header({ cart, removeFromCart, updateQty, subtotal, activeView, setActiveView, user, onLogin, onLogout }) {
   const [open, setOpen] = useState(false);
   const [drawer, setDrawer] = useState(false);
+  const [authOpen, setAuthOpen] = useState(false);
 
-  // Use the more premium-looking wordmark
   const Brand = LogoWordmark;
+
+  const canAccessAdmin = user.loggedIn && (user.role === 'admin' || user.role === 'manager');
 
   return (
     <header className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-neutral-950/70 bg-neutral-950 border-b border-neutral-900">
@@ -46,15 +97,25 @@ export default function Header({ cart, removeFromCart, updateQty, subtotal }) {
           <Brand />
         </a>
         <nav className="hidden md:flex items-center gap-6 text-sm">
-          <a href="#shop" className="hover:text-yellow-400 transition">Shop</a>
+          <button onClick={()=>setActiveView('shop')} className={`hover:text-yellow-400 transition ${activeView==='shop'?'text-yellow-400':''}`}>Shop</button>
+          {canAccessAdmin && (
+            <button onClick={()=>setActiveView('admin')} className={`hover:text-yellow-400 transition ${activeView==='admin'?'text-yellow-400':''}`}>Admin</button>
+          )}
           <a href="#about" className="hover:text-yellow-400 transition">About</a>
           <a href="#contact" className="hover:text-yellow-400 transition">Contact</a>
           <a href="#policy" className="hover:text-yellow-400 transition">Returns</a>
         </nav>
         <div className="flex items-center gap-2">
-          <button className="hidden sm:inline-flex items-center gap-2 rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-xs hover:border-yellow-500 hover:text-yellow-400">
-            <User size={16} /> Login / Signup
-          </button>
+          {!user.loggedIn ? (
+            <button onClick={()=>setAuthOpen(true)} className="hidden sm:inline-flex items-center gap-2 rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-xs hover:border-yellow-500 hover:text-yellow-400">
+              <User size={16} /> Login / Signup
+            </button>
+          ) : (
+            <div className="hidden sm:flex items-center gap-2 text-xs text-neutral-300">
+              <span className="rounded-full border border-neutral-800 bg-neutral-900 px-2 py-1">{user.name} • {user.role}</span>
+              <button onClick={onLogout} className="inline-flex items-center gap-1 rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 hover:border-yellow-500"><LogOut size={14}/>Logout</button>
+            </div>
+          )}
           <button onClick={() => setDrawer(true)} className="relative p-2 rounded-md hover:bg-neutral-900" aria-label="Open cart">
             <ShoppingCart size={20} />
             {cart.length > 0 && (
@@ -69,13 +130,21 @@ export default function Header({ cart, removeFromCart, updateQty, subtotal }) {
       {open && (
         <div className="md:hidden border-t border-neutral-900 px-4 pb-3">
           <div className="flex flex-col py-2 text-sm">
-            <a href="#shop" className="py-2">Shop</a>
+            <button onClick={()=>{setActiveView('shop');setOpen(false);}} className="py-2 text-left">Shop</button>
+            {canAccessAdmin && <button onClick={()=>{setActiveView('admin');setOpen(false);}} className="py-2 text-left">Admin</button>}
             <a href="#about" className="py-2">About</a>
             <a href="#contact" className="py-2">Contact</a>
             <a href="#policy" className="py-2">Returns</a>
-            <button className="mt-2 inline-flex items-center gap-2 rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-xs w-max">
-              <User size={16} /> Login / Signup
-            </button>
+            {!user.loggedIn ? (
+              <button onClick={()=>setAuthOpen(true)} className="mt-2 inline-flex items-center gap-2 rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-xs w-max">
+                <User size={16} /> Login / Signup
+              </button>
+            ) : (
+              <div className="mt-2 flex items-center gap-2">
+                <span className="text-xs text-neutral-400">{user.name} • {user.role}</span>
+                <button onClick={onLogout} className="inline-flex items-center gap-1 rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-xs"><LogOut size={14}/>Logout</button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -134,11 +203,13 @@ export default function Header({ cart, removeFromCart, updateQty, subtotal }) {
                   <Shield size={16} /> Secure Pay
                 </button>
               </div>
-              <p className="text-xs text-neutral-500">Payments protected by encrypted checkout. Razorpay/Stripe can be integrated on backend.</p>
+              <p className="text-xs text-neutral-500">Demo checkout. Integrate Razorpay/Stripe on backend for production.</p>
             </div>
           </aside>
         </div>
       )}
+
+      <AuthDialog open={authOpen} onClose={()=>setAuthOpen(false)} onLogin={onLogin} />
     </header>
   );
 }
